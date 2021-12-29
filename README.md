@@ -6,4 +6,6 @@ This Bot is Japanese Only
 pip install -r requirements.txt  
 main.py  
 
+※このBOTははLinuxのみ動作します
+
 以上バグ等あれば報告して下さい
