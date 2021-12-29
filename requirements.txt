@@ -1,0 +1,7 @@
+espnet
+pycord
+espnet
+MeCab
+alkana
+emoji
+pysoundfile
