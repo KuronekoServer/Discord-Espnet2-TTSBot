@@ -1,6 +1,6 @@
 espnet
 pycord
-MeCab
+mecab-python3
 alkana
 emoji
 pysoundfile
