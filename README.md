@@ -1,4 +1,4 @@
-# Discord-Japanese-TTS-Bot  
+# Discord-ESPNET2-TTSBot  
 This Bot is Japanese Only
 このBOTは日本語専用です  
 
