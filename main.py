@@ -3,7 +3,6 @@ import discord
 from espnet2.bin.tts_inference import Text2Speech
 from espnet2.utils.types import str_or_none
 import torch
-import discord
 import os
 import MeCab
 import subprocess
@@ -16,8 +15,9 @@ import emoji
 from urllib.parse import urlparse
 import unicodedata as ud
 import asyncio
+import time
 
-TOKEN = "トークン"
+TOKEN = "OTA1MjE5MDcyMDYzNTg2MzU1.YYG49A.wDLTEy6LIUA2gSShF34mNdjskLs"
 
 mypath = os.getcwd() + "/"
 dict = []
@@ -28,10 +28,24 @@ __AUTHOR = "YH"
 
 alkana.add_external_data('./additional_dictionaly.csv')
 
+limit_timeout = 8
+timeout_time = 60
+spam_threshould = 300
+
 def wakati(sentence):
     wakati = MeCab.Tagger("-Owakati")
     words = wakati.parse(sentence).split()
     return words
+
+def is_meaning(sen, words):
+    spam = 0
+    for word in words:
+        if word[:1] == "死":
+            spam += 70
+        cnt = sen.count(word)
+        spam += cnt
+    spam += len(words)
+    return spam
 
 def exec_cmd(cmd):
     try:
@@ -71,8 +85,6 @@ class dictionaly():
         f.close()
 
     def apliy(self, sen):
-        for i in range(len(sys_dict_moto)):
-            sen = sen.replace(sys_dict_moto[i], sys_dict_henkan[i])
         for i in range(len(self.moto)):
             sen = sen.replace(self.moto[i], self.henkan[i])
         return sen
@@ -137,6 +149,10 @@ class server():
         self.ryaku = 50
         self.prefix = "!"
         self.cid = ""
+        self.timeout = 0
+        self.time = 0
+        self.nowtime = 0
+        self.spam = 0
         if os.path.exists(mypath + "state/" + str(self.sid) + ".ini") == False:
             newfile(mypath + "state/" + str(self.sid) + ".ini")
             f = open(mypath + "state/" + str(self.sid) + ".ini", 'w')
@@ -193,6 +209,25 @@ text2speech_1 = Text2Speech.from_pretrained(
     noise_scale_dur=0.333,
 )
 
+text2speech_1_slow = Text2Speech.from_pretrained(
+    model_tag=str_or_none('kan-bayashi/tsukuyomi_full_band_vits_prosody'),
+    vocoder_tag=str_or_none('parallel_wavegan/jsut_multi_band_melgan.v2'),
+    device="cpu",
+    # Only for Tacotron 2 & Transformer
+    threshold=0.5,
+    # Only for Tacotron 2
+    minlenratio=0.0,
+    maxlenratio=10.0,
+    use_att_constraint=False,
+    backward_window=1,
+    forward_window=3,
+    # Only for FastSpeech & FastSpeech2 & VITS
+    speed_control_alpha=2,
+    # Only for VITS
+    noise_scale=0.333,
+    noise_scale_dur=0.333,
+)
+
 text2speech_2 = Text2Speech.from_pretrained(
     model_tag=str_or_none('kan-bayashi/jsut_tacotron2'),
     vocoder_tag=str_or_none('none'),
@@ -212,10 +247,13 @@ text2speech_2 = Text2Speech.from_pretrained(
     noise_scale_dur=0.333,
 )
 
-def tts2wav(sentence, mod):
+def tts2wav(sentence, mod, slow):
     with torch.no_grad():
     	if mod == 1:
-            wav = text2speech_1(sentence)["wav"]
+            if slow == 0:
+                wav = text2speech_1(sentence)["wav"]
+            else:
+                wav = text2speech_1_slow(sentence)["wav"]
     	if mod == 2:
             wav = text2speech_2(sentence)["wav"]
     sf.write(mypath + "tts/" + sentence + ".wav", wav, glo.sr, format=glo._format, subtype=glo.subtype)
@@ -240,8 +278,14 @@ def check_url(url):
     return flag
 
 def edit_sentence(sen, i, j):
+    if sen[:1] == "|" and sen[len(sen)-1:] in "|":
+        print("slow")
+        sen.replace("|", "")
+        slow = 1
+    else:
+        slow = 0
     if re.search("http://", sen) != None or re.search("https://", sen) != None:
-        if check_url(sen) != False:
+        if check_url(sen.split(" ")[0]) != False:
              sen = "URLが送信されました"
         else:
              sen = "URLが送信されました"
@@ -250,14 +294,14 @@ def edit_sentence(sen, i, j):
             sen = "スタンプが添付されました"
     sen = emoji.demojize(sen)
     sen = ryaku(sen, i)
-        alp = wakati(sen)
-        for i in range(len(alp)):
-            if alkana.get_kana(alp[i]) != None:
-                    sen = sen.replace(alp[i], alkana.get_kana(alp[i]))
+    alp = wakati(sen)
+    for i in range(len(alp)):
+        if alkana.get_kana(alp[i]) != None:
+            sen = sen.replace(alp[i], alkana.get_kana(alp[i]))
     sen = dict[j].apliy(sen)
     print(alp)
     print(sen)
-    return sen
+    return sen, slow
 
 def remove_glob(pathname, recursive=True):
     for p in glob.glob(pathname, recursive=recursive):
@@ -382,52 +426,85 @@ async def on_message(message):
             await message.channel.send("```接続していません。```")
             return
         state[array_state_jump].cid = ""
+        state[array_state_jump].spam = 0
         await message.guild.voice_client.disconnect()
         await message.channel.send("```切断しました。```")
+    if message.content == prefix + "ping":
+        await message.channel.send("```botのレイテンシー: " + str(round(client.latency*1000)) + "ms```")
+        return
     if message.content == prefix + "about":
         await message.channel.send("```こんにちは！読み上げちゃんです！\nこのBOTは" + __AUTHOR + "によって一から作られました\n協力してくれた人\n------------------\n黒猫ちゃん\n------------------\nサポートサーバー\nhttps://discord.gg/nhjJ4XzhZm\nhttps://discord.gg/Y6w5Jv3EAR```")
+        return
     if state[array_state_jump].cid == message.channel.id:
-        sen = message.content
-        if len(message.attachments) != 0:
-            file = message.attachments[0]
-            type = file.filename.split(".")[1].lower()
-            if type == "webp" or type == "jpg" or type == "png" or type == "gif" or type == "bmp":
-                sen = "画像が添付されました"
-            elif type == "mp3" or type == "m4a" or type == "wav" or type == "ogg" or type == "flac" or type == "aac":
-                sen = "音声ファイルが添付されました"
-            elif type == "mov" or type == "mp4" or type == "mkv" or type == "avi":
-                sen = "動画ファイルが添付されました"
-            elif type == "txt":
-                sen = "テキストファイルが添付されました"
+        if state[array_state_jump].timeout != 1:
+            if state[array_state_jump].spam == 1:
+                await message.channel.send("```スパムかな？```")
+            elif state[array_state_jump].spam == 2:
+                await message.channel.send("```やめようねｗ？```")
+            nowtime = time.time()
+            state[array_state_jump].time =  nowtime - state[array_state_jump].nowtime
+            print(is_meaning(message.content, wakati(message.content)))
+            print(state[array_state_jump].spam)
+            if state[array_state_jump].spam > 2:
+                state[array_state_jump].timeout = 1
+                state[array_state_jump].spam = 0
+                await message.channel.send("```タイムアウトが有効になりました\nすこし落ち着きましょうｗby黒猫```")
+            if is_meaning(message.content, wakati(message.content)) > spam_threshould:
+                state[array_state_jump].spam += 1
+                return
             else:
-                sen = "ファイルが添付されました"
-        sents = sen.split("\n")
-        for s in sents:
-            if message.mentions is not None:
-                for mention in re.findall(r"@(everyone|here|[!&]?[0-9]{17,20})", message.content):
-                    if mention.replace("@", "") == "everyone":
-                        s = s.replace("@everyone", "@ everyone")
-                    elif mention.replace("@", "") == "here":
-                        s = s.replace("@here", "@ here")
-                    else:
-                        userId = re.match(r"[0-9]+", str(mention.replace("!", ""))).group()
-                        try:
-                            u = await client.fetch_user(int(userId))
-                        except:
-                            sen = sen.replace(mention, "@" + str(userId))
-                        else:
-                            if userId.isdigit():
-                                s = s.replace(mention, u.name)
+                state[array_state_jump].spam = 0
+            if state[array_state_jump].time < limit_timeout and is_meaning(message.content, wakati(message.content)) > spam_threshould:
+                state[array_state_jump].spam += 1
+                return
+            else:
+                state[array_state_jump].spam = 0
+            state[array_state_jump].nowtime = nowtime
+            sen = message.content
+            if len(message.attachments) != 0:
+                file = message.attachments[0]
+                type = file.filename.split(".")[1].lower()
+                if type == "webp" or type == "jpg" or type == "png" or type == "gif" or type == "bmp":
+                    sen = "画像が添付されました"
+                elif type == "mp3" or type == "m4a" or type == "wav" or type == "ogg" or type == "flac" or type == "aac":
+                    sen = "音声ファイルが添付されました"
+                elif type == "mov" or type == "mp4" or type == "mkv" or type == "avi":
+                    sen = "動画ファイルが添付されました"
+                elif type == "txt":
+                    sen = "テキストファイルが添付されました"
                 else:
-                    s = discord.utils.escape_mentions(s)
-            if re.search("<#", sen) != None and re.search(">", sen) != None:
-                cn = client.get_channel(int(s[2:].replace(">", "")))
-                s = cn.name
-            sen = edit_sentence(s, array_state_jump, array_dict_jump)
-            message.guild.voice_client.play(discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(tts2wav(sen,state[array_state_jump].mod)), volume=(state[array_state_jump].vol / 100)))
-#            await message.channel.send(sen)
-            await asyncio.sleep(1)
-            remove_glob(mypath + "tts/" + sen + ".wav")
+                    sen = "ファイルが添付されました"
+            sents = sen.split("\n")
+            for s in sents:
+                if message.mentions is not None:
+                    for mention in re.findall(r"@(everyone|here|[!&]?[0-9]{17,20})", message.content):
+                        if mention.replace("@", "") == "everyone":
+                            s = s.replace("@everyone", "@ everyone")
+                        elif mention.replace("@", "") == "here":
+                            s = s.replace("@here", "@ here")
+                        else:
+                            userId = re.match(r"[0-9]+", str(mention.replace("!", ""))).group()
+                            try:
+                                u = await client.fetch_user(int(userId))
+                            except:
+                                sen = sen.replace(mention, "@" + str(userId))
+                            else:
+                                if userId.isdigit():
+                                    s = s.replace(mention, u.name)
+                    else:
+                        s = discord.utils.escape_mentions(s)
+                if re.search("<#", sen) != None and re.search(">", sen) != None:
+                    cn = client.get_channel(int(s[2:].replace(">", "")))
+                    s = cn.name
+                sen, slow = edit_sentence(s, array_state_jump, array_dict_jump)
+                message.guild.voice_client.play(discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(tts2wav(sen,state[array_state_jump].mod,slow)), volume=(state[array_state_jump].vol / 100)))
+    #            await message.channel.send(sen)
+                await asyncio.sleep(len(sen)/10)
+                remove_glob(mypath + "tts/" + sen + ".wav")
+        else:
+            if state[array_state_jump].nowtime + (60*timeout_time) < time.time():
+                state[array_state_jump].timeout = 0
+                await message.channel.send("```タイムアウトが解除されました```")
 
     await client.change_presence(activity=discord.Game(name=f"BOT利用数：{len(client.guilds)}サーバー"))
 
