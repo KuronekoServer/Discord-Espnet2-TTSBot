@@ -17,7 +17,7 @@ import unicodedata as ud
 import asyncio
 import time
 
-TOKEN = "OTA1MjE5MDcyMDYzNTg2MzU1.YYG49A.wDLTEy6LIUA2gSShF34mNdjskLs"
+TOKEN = "TOKEN"
 
 mypath = os.getcwd() + "/"
 dict = []
