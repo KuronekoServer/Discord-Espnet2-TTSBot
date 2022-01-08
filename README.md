@@ -4,7 +4,8 @@ This Bot is Japanese Only
 
 導入方法：  
 pip install -r requirements.txt  
-main.py  
+このzipをダウンロードしてbotファイルに入れる
+https://we.tl/t-oNsJOdbmHE
 
 ※このBOTははLinuxのみ動作します
 
