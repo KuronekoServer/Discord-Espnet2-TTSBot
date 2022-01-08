@@ -23,8 +23,8 @@ mypath = os.getcwd() + "/"
 dict = []
 state = []
 
-prefix = "yom:"
-__AUTHOR = "YH"
+prefix = "prefixを入れる"
+__AUTHOR = "KuronekoServer"
 
 alkana.add_external_data('./additional_dictionaly.csv')
 
@@ -149,10 +149,12 @@ class server():
         self.ryaku = 50
         self.prefix = "!"
         self.cid = ""
+        self.rate = 48000
         self.timeout = 0
         self.time = 0
         self.nowtime = 0
         self.spam = 0
+        self.is_connect = 0
         if os.path.exists(mypath + "state/" + str(self.sid) + ".ini") == False:
             newfile(mypath + "state/" + str(self.sid) + ".ini")
             f = open(mypath + "state/" + str(self.sid) + ".ini", 'w')
@@ -183,6 +185,13 @@ def check_state(sid):
         if state[i].sid == sid:
             return i
     return -1
+
+def get_connect_num():
+    num = 0
+    for i in range(len(state)):
+        if state[i].is_connect == 1:
+            num += 1
+    return num
 
 def ryaku(sentence, i):
     if len(sentence) >= state[i].ryaku:
@@ -229,7 +238,7 @@ text2speech_1_slow = Text2Speech.from_pretrained(
 )
 
 text2speech_2 = Text2Speech.from_pretrained(
-    model_tag=str_or_none('kan-bayashi/jsut_tacotron2'),
+     **d.download_and_unpack('./tts_train_tacotron2_osaka_raw_phn_jaconv_pyopenjtalk_train.loss.ave.zip'),
     vocoder_tag=str_or_none('none'),
     device="cpu",
     # Only for Tacotron 2 & Transformer
@@ -247,19 +256,87 @@ text2speech_2 = Text2Speech.from_pretrained(
     noise_scale_dur=0.333,
 )
 
-def tts2wav(sentence, mod, slow):
+text2speech_3 = Text2Speech.from_pretrained(
+    model_tag=str_or_none("kan-bayashi/jsut_full_band_vits_prosody"),
+    vocoder_tag=str_or_none('none'),
+    device="cpu",
+    # Only for Tacotron 2 & Transformer
+    threshold=0.5,
+    # Only for Tacotron 2
+    minlenratio=0.0,
+    maxlenratio=10.0,
+    use_att_constraint=False,
+    backward_window=1,
+    forward_window=3,
+    # Only for FastSpeech & FastSpeech2 & VITS
+    speed_control_alpha=1,
+    # Only for VITS
+    noise_scale=0.333,
+    noise_scale_dur=0.333,
+)
+
+text2speech_2_slow = Text2Speech.from_pretrained(
+     **d.download_and_unpack('./tts_train_tacotron2_osaka_raw_phn_jaconv_pyopenjtalk_train.loss.ave.zip'),
+    vocoder_tag=str_or_none('none'),
+    device="cpu",
+    # Only for Tacotron 2 & Transformer
+    threshold=0.5,
+    # Only for Tacotron 2
+    minlenratio=0.0,
+    maxlenratio=10.0,
+    use_att_constraint=False,
+    backward_window=1,
+    forward_window=3,
+    # Only for FastSpeech & FastSpeech2 & VITS
+    speed_control_alpha=2,
+    # Only for VITS
+    noise_scale=0.333,
+    noise_scale_dur=0.333,
+)
+
+text2speech_3_slow = Text2Speech.from_pretrained(
+    model_tag=str_or_none("kan-bayashi/jsut_full_band_vits_prosody"),
+    vocoder_tag=str_or_none('none'),
+    device="cpu",
+    # Only for Tacotron 2 & Transformer
+    threshold=0.5,
+    # Only for Tacotron 2
+    minlenratio=0.0,
+    maxlenratio=10.0,
+    use_att_constraint=False,
+    backward_window=1,
+    forward_window=3,
+    # Only for FastSpeech & FastSpeech2 & VITS
+    speed_control_alpha=2,
+    # Only for VITS
+    noise_scale=0.333,
+    noise_scale_dur=0.333,
+)
+
+def tts2wav(sentence, mod, slow, rate):
     with torch.no_grad():
-    	if mod == 1:
+      if mod == 1:
+            rate = 48000
             if slow == 0:
                 wav = text2speech_1(sentence)["wav"]
             else:
                 wav = text2speech_1_slow(sentence)["wav"]
-    	if mod == 2:
-            wav = text2speech_2(sentence)["wav"]
-    sf.write(mypath + "tts/" + sentence + ".wav", wav, glo.sr, format=glo._format, subtype=glo.subtype)
-    return mypath + "tts/" + sentence + ".wav"
-    if os.path.exists(mypath + "tts/" + sentence + ".wav") == False:
-        return -1
+      if mod == 3:
+            rate = 48000
+            if slow == 0:
+                wav = text2speech_3(sentence)["wav"]
+            else:
+                wav = text2speech_3_slow(sentence)["wav"]
+      if mod == 2:
+            rate = 24000
+            if slow == 0:
+                wav = text2speech_2(sentence)["wav"]
+            else:
+                wav = text2speech_2_slow(sentence)["wav"]
+      sf.write(mypath + "tts/" + sentence + ".wav", wav, rate, format=glo._format, subtype=glo.subtype)
+      return mypath + "tts/" + sentence + ".wav"
+      if os.path.exists(mypath + "tts/" + sentence + ".wav") == False:
+            return -1
 
 def check_url(url):
     flag = True
@@ -351,6 +428,7 @@ async def on_message(message):
             return
         # ボイスチャンネルに接続する
         state[array_state_jump].cid = message.channel.id
+        state[array_state_jump].is_connect = 1
         await message.author.voice.channel.connect()
         await message.channel.send("```接続しました。```")
         message.content = "接続しました"
@@ -374,16 +452,21 @@ async def on_message(message):
     if re.search(prefix + "voice", message.content) != None:
         sent = message.content
         sent = sent.replace(prefix + "voice ","")
+        if sent == "":
+            await message.channel.send("```声 1:つくよみちゃん 2:? 3:JSUT```")
         num = int(sent)
         if num == 1:
-            glo.sr = 48000
+            state[array_state_jump].rate = 48000
             state[array_state_jump].mod = 1
             await message.channel.send("```音声を変えました。```")
         elif num == 2:
-            glo.sr = 48000
+            state[array_state_jump].rate = 24000
             state[array_state_jump].mod = 2
             await message.channel.send("```音声を変えました。```")
-        state[array_state_jump].apliy()
+        elif num == 3:
+            state[array_state_jump].rate = 24000
+            state[array_state_jump].mod = 3
+            await message.channel.send("```音声を変えました。```")
         return
     if re.search(prefix + "volume", message.content) != None:
         sent = message.content
@@ -427,13 +510,14 @@ async def on_message(message):
             return
         state[array_state_jump].cid = ""
         state[array_state_jump].spam = 0
+        state[array_state_jump].is_connect = 0 
         await message.guild.voice_client.disconnect()
         await message.channel.send("```切断しました。```")
     if message.content == prefix + "ping":
         await message.channel.send("```botのレイテンシー: " + str(round(client.latency*1000)) + "ms```")
         return
     if message.content == prefix + "about":
-        await message.channel.send("```こんにちは！読み上げちゃんです！\nこのBOTは" + __AUTHOR + "によって一から作られました\n協力してくれた人\n------------------\n黒猫ちゃん\n------------------\nサポートサーバー\nhttps://discord.gg/nhjJ4XzhZm\nhttps://discord.gg/Y6w5Jv3EAR```")
+        await message.channel.send("```こんにちは！読み上げちゃんです！\nこのBOTは" + __AUTHOR + "によって一から作られました\n協力してくれた人\n------------------\nYH,黒猫ちゃん\n------------------\nサポートサーバー\nhttps://discord.gg/nhjJ4XzhZm\nhttps://discord.gg/Y6w5Jv3EAR```")
         return
     if state[array_state_jump].cid == message.channel.id:
         if state[array_state_jump].timeout != 1:
@@ -497,7 +581,7 @@ async def on_message(message):
                     cn = client.get_channel(int(s[2:].replace(">", "")))
                     s = cn.name
                 sen, slow = edit_sentence(s, array_state_jump, array_dict_jump)
-                message.guild.voice_client.play(discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(tts2wav(sen,state[array_state_jump].mod,slow)), volume=(state[array_state_jump].vol / 100)))
+                message.guild.voice_client.play(discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(tts2wav(sen,state[array_state_jump].mod,slow,state[array_state_jump].rate)), volume=(state[array_state_jump].vol / 100)))
     #            await message.channel.send(sen)
                 await asyncio.sleep(len(sen)/10)
                 remove_glob(mypath + "tts/" + sen + ".wav")
@@ -506,6 +590,6 @@ async def on_message(message):
                 state[array_state_jump].timeout = 0
                 await message.channel.send("```タイムアウトが解除されました```")
 
-    await client.change_presence(activity=discord.Game(name=f"BOT利用数：{len(client.guilds)}サーバー"))
+    await client.change_presence(activity=discord.Game(name="BOT利用数：" + str(len(client.guilds)) + "サーバー\n接続数：" + str(get_connect_num())))
 
 client.run(TOKEN)
