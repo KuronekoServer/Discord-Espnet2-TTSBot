@@ -5,6 +5,7 @@ from espnet2.utils.types import str_or_none
 import torch
 import os
 import MeCab
+import sys
 import subprocess
 import alkana
 import re
@@ -16,6 +17,9 @@ from urllib.parse import urlparse
 import unicodedata as ud
 import asyncio
 import time
+from espnet_model_zoo.downloader import ModelDownloader
+
+d = ModelDownloader()  # <module_dir> is used as cachedir by default
 
 TOKEN = "TOKEN"
 
@@ -23,7 +27,7 @@ mypath = os.getcwd() + "/"
 dict = []
 state = []
 
-prefix = "prefixを入れる"
+prefix = "!"
 __AUTHOR = "KuronekoServer"
 
 alkana.add_external_data('./additional_dictionaly.csv')
@@ -422,7 +426,7 @@ async def on_message(message):
         state.append("")
         state[num] = server(message.guild.id)
         array_state_jump = num
-    if message.content == prefix + "join":
+    if message.content == prefix + "jn":
         if message.author.voice is None:
             await message.channel.send("あなたはボイスチャンネルに接続していません。")
             return
@@ -448,7 +452,7 @@ async def on_message(message):
         dict[array_dict_jump].apliy_file()
         return
     if message.content == prefix + "help":
-        await message.channel.send("```" + prefix + "help: コマンドの詳細を表示します\n" + prefix + "join: ボイスチャンネルに接続します\n" + prefix + "add: 辞書に単語を追加します\n" + prefix + "remove: 辞書から単語を削除します\n" + prefix + "volume: 音量を変更します\n" + prefix + "ryaku: 読む長さを変更します\n" + prefix + "leave: ボイスチャンネルから切断します\n" + prefix + "about: ボットの詳細を表示します```")
+        await message.channel.send("```" + prefix + "help: コマンドの詳細を表示します\n" + prefix + "jn: ボイスチャンネルに接続します\n" + prefix + "add: 辞書に単語を追加します\n" + prefix + "remove: 辞書から単語を削除します\n" + prefix + "volume: 音量を変更します\n" + prefix + "ryaku: 読む長さを変更します\n" + prefix + "lv: ボイスチャンネルから切断します\n" + prefix + "about: ボットの詳細を表示します```")
     if re.search(prefix + "voice", message.content) != None:
         sent = message.content
         sent = sent.replace(prefix + "voice ","")
@@ -504,7 +508,7 @@ async def on_message(message):
         await message.channel.send("```略の長さを変えました。 => " + str(state[array_state_jump].ryaku) + "```")
         state[array_state_jump].apliy()
         return
-    if message.content == prefix + "leave":
+    if message.content == prefix + "lv":
         if message.guild.voice_client is None:
             await message.channel.send("```接続していません。```")
             return
@@ -517,7 +521,7 @@ async def on_message(message):
         await message.channel.send("```botのレイテンシー: " + str(round(client.latency*1000)) + "ms```")
         return
     if message.content == prefix + "about":
-        await message.channel.send("```こんにちは！読み上げちゃんです！\nこのBOTは" + __AUTHOR + "によって一から作られました\n協力してくれた人\n------------------\nYH,黒猫ちゃん\n------------------\nサポートサーバー\nhttps://discord.gg/nhjJ4XzhZm\nhttps://discord.gg/Y6w5Jv3EAR```")
+        await message.channel.send("```こんにちは！読み上げちゃんです！\nこのBOTは" + __AUTHOR + "によって一から作られました\n協力してくれた人\n------------------\nYH,黒猫ちゃん\n------------------\nサポートサーバー\nhttps://discord.gg/Y6w5Jv3EAR```")
         return
     if state[array_state_jump].cid == message.channel.id:
         if state[array_state_jump].timeout != 1:
@@ -590,6 +594,7 @@ async def on_message(message):
                 state[array_state_jump].timeout = 0
                 await message.channel.send("```タイムアウトが解除されました```")
 
-    await client.change_presence(activity=discord.Game(name="BOT利用数：" + str(len(client.guilds)) + "サーバー\n接続数：" + str(get_connect_num())))
+    await client.change_presence(activity=discord.Game(name="導入数：" + str(len(client.guilds)) + " | 接続数：" + str(get_connect_num())))
 
 client.run(TOKEN)
+
