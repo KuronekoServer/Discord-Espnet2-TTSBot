@@ -597,4 +597,3 @@ async def on_message(message):
     await client.change_presence(activity=discord.Game(name="導入数：" + str(len(client.guilds)) + " | 接続数：" + str(get_connect_num())))
 
 client.run(TOKEN)
-
