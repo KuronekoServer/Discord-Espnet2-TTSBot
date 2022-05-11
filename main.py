@@ -389,7 +389,7 @@ def remove_glob(pathname, recursive=True):
         if os.path.isfile(p):
             os.remove(p)
 
-client = discord.Client()
+client = discord.Client(allowed_mentions=discord.AllowedMentions.none())
 
 @client.event
 
