@@ -5,7 +5,7 @@ This Bot is Japanese Only
 導入方法：  
 pip install -r requirements.txt  
 このzipをダウンロードしてbotファイルに入れる(zipのまま)
-https://kuroneko64423.com/tts_train_tacotron2_osaka_raw_phn_jaconv_pyopenjtalk_train.loss.ave.zip
+https://kuroneko6423.com/tts_train_tacotron2_osaka_raw_phn_jaconv_pyopenjtalk_train.loss.ave.zip
 
 ※このBOTははLinuxのみ動作します
 
